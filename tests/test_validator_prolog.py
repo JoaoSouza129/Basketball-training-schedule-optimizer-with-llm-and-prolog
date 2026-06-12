@@ -6,7 +6,7 @@ import os
 import tempfile
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
+from prolog_bridge import validate_plan
 PROLOG_DIR = os.path.abspath("prolog")
 CONSTRAINTS_PATH = os.path.join(PROLOG_DIR, "constraints.pl")
 RUN_VALIDATION_PATH = os.path.join(PROLOG_DIR, "run_validation.pl")
@@ -67,9 +67,9 @@ class TestPrologValidator:
             availability(days([monday, wednesday, friday]), minutes_per_day(60)).
             goal(primary(shooting), secondary(none)).
             rest_day(tuesday). rest_day(thursday). rest_day(saturday). rest_day(sunday).
-            block_catalog(warmup_dynamic, "Warmup", [intensity_range(1,2), contraindications([]), recovery_cost(1)]).
-            block_catalog(shooting_catch_and_shoot, "Shoot", [intensity_range(2,3), contraindications([]), recovery_cost(2)]).
-            block_catalog(cooldown_static_stretching, "Cooldown", [intensity_range(1,1), contraindications([]), recovery_cost(1)]).
+            block_catalog(warmup_dynamic, 1, 2, none, 1).
+            block_catalog(shooting_catch_and_shoot, 2, 3, none, 2).
+            block_catalog(cooldown_static_stretching, 1, 1, none, 1).
             session(monday, [block(warmup_dynamic, 10, 2, []), block(shooting_catch_and_shoot, 30, 3, []), block(cooldown_static_stretching, 10, 1, [])]).
             session(wednesday, [block(warmup_dynamic, 10, 2, []), block(shooting_catch_and_shoot, 30, 3, []), block(cooldown_static_stretching, 10, 1, [])]).
             session(friday, [block(warmup_dynamic, 10, 2, []), block(shooting_catch_and_shoot, 30, 3, []), block(cooldown_static_stretching, 10, 1, [])]).
@@ -148,3 +148,164 @@ class TestPrologValidator:
         """
         result = run_prolog_validation(facts)
         assert result["result"] == "invalid"
+
+    def test_(self):
+        # 1. Atleta com lesão no joelho (knee)
+        atleta_lesionado = {
+            "profile": {"level": "beginner"},
+            "physical_restrictions": {"injury_region": "knee"},
+            "availability": {
+                "available_days": ["monday"],
+                "minutes_per_day": 30
+            }
+        }
+
+        # 2. Catálogo onde o bloco 'depth_jumps' tem contraindicação 'knee' e custo 10
+        # Lembra-te de passar o formato que a tua função catalog_to_facts espera receber!
+        catalogo_teste = [
+            {
+                "id": "depth_jumps",
+                "name": "Depth Jumps",
+                "intensity_range": [4, 5],
+                "contraindications": ["knee"],
+                "recovery_cost": 10
+            }
+        ]
+
+        # 3. O plano semanal gerado (como se viesse do LLM) que força o erro
+        plano_invalido = {
+            "weekly_plan": {
+                "monday": {
+                    "sessions": [
+                        {
+                            "block_id": "depth_jumps",
+                            "duration_minutes": 20,
+                            "intensity": 4,
+                            "tags": ["plyometrics"]
+                        }
+                    ]
+                },
+                "tuesday": None, "wednesday": None, "thursday": None, "friday": None, "saturday": None, "sunday": None
+            }
+        }
+
+        # 4. Executar a validação
+
+        resultado = validate_plan(atleta_lesionado, plano_invalido, catalogo_teste)
+
+        # 5. O que esperamos que aconteça?
+        # Se o teu Prolog estiver bem afinado, is_valid deve ser False e a regra violada deve ser apanhada!
+        assert resultado["is_valid"] is False
+        
+        # Vamos inspecionar as violações que o teu dicionário traz
+        regras_violadas = [v["rule"] for v in resultado["violations"]]
+        print("Regras que o Prolog apanhou:", regras_violadas)
+        
+        assert "blocked_block_due_to_injury" in regras_violadas
+    
+    def test_ultrapassar_carga_semanal(self):
+        atleta = {
+            "profile": {"level": "beginner"},
+            "physical_restrictions": {"injury_region": "none"},
+            "availability": {
+                "available_days": ["monday","tuesday","wednesday","friday","sunday"],
+                "minutes_per_day": 90
+            }
+        }
+        
+        catalogo_teste = [
+            {
+                "id": "plyometrics_depth_jumps",
+                "name": "Depth Jumps",
+                "intensity_range": [4, 5],
+                "contraindications": ["knee"],
+                "recovery_cost": 2
+            },
+            {
+                "id": "shooting_catch_and_shoot",
+                "name": "lançamento",
+                "intensity_range": [4, 5],
+                "contraindications": "none",
+                "recovery_cost": 2
+            }
+        ]
+        
+        plano_invalido = {
+            "weekly_plan": {
+                "monday": {
+                    "sessions": [
+                        {
+                            "block_id": "plyometrics_depth_jumps",
+                            "duration_minutes": 20,
+                            "intensity": 4,
+                            "tags": ["plyometrics"]
+                        }, 
+                        {
+                            "block_id": "shooting_catch_and_shoot",
+                            "duration_minutes": 70,
+                            "intensity": 4,
+                            "tags": ["shooting"]
+                        }   
+                    ]
+                },
+                "tuesday": {
+                    "sessions": [
+                        {
+                            "block_id": "plyometrics_depth_jumps",
+                            "duration_minutes": 20,
+                            "intensity": 1,
+                            "tags": ["plyometrics"]
+                        }, 
+                        {
+                            "block_id": "shooting_catch_and_shoot",
+                            "duration_minutes": 70,
+                            "intensity": 2,
+                            "tags": ["shooting"]
+                        }   
+                    ]
+                },
+                "friday": {
+                    "sessions": [
+                        {
+                            "block_id": "plyometrics_depth_jumps",
+                            "duration_minutes": 20,
+                            "intensity": 4,
+                            "tags": ["plyometrics"]
+                        }, 
+                        {
+                            "block_id": "shooting_catch_and_shoot",
+                            "duration_minutes": 70,
+                            "intensity": 4,
+                            "tags": ["shooting"]
+                        }   
+                    ]
+                },
+                "sunday": {
+                    "sessions": [
+                        {
+                            "block_id": "plyometrics_depth_jumps",
+                            "duration_minutes": 20,
+                            "intensity": 4,
+                            "tags": ["plyometrics"]
+                        }, 
+                        {
+                            "block_id": "shooting_catch_and_shoot",
+                            "duration_minutes": 70,
+                            "intensity": 4,
+                            "tags": ["shooting"]
+                        }   
+                    ]
+                },
+                "wednesday": None, "thursday": None, "saturday": None,
+            }
+        }
+        
+        resultado = validate_plan(atleta, plano_invalido, catalogo_teste)
+
+        # 5. O que esperamos que aconteça?
+        # Se o teu Prolog estiver bem afinado, is_valid deve ser False e a regra violada deve ser apanhada!
+        assert resultado["is_valid"] is False
+        regras_violadas = [v["rule"] for v in resultado["violations"]]
+        print("Regras que o Prolog apanhou:", regras_violadas)
+        
+        assert "weekly_load_exceeded" in regras_violadas

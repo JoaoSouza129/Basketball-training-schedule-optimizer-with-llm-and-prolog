@@ -118,9 +118,9 @@ check_blocks_in_catalog :-
 % -----------------------------------------------------------
 % Regra 6 — Carga semanal maxima por nível
 % -----------------------------------------------------------
-max_load_for_level(beginner, 800).
-max_load_for_level(intermediate, 1200).
-max_load_for_level(advanced, 2000).
+max_load_for_level(beginner, 150).
+max_load_for_level(intermediate, 250).
+max_load_for_level(advanced, 400).
 
 check_weekly_load_limit :-
     athlete(level(Level), _),
