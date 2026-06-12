@@ -4,6 +4,7 @@
 
 :- consult('constraints.pl').
 
+
 run_validation :-
     validate_plan(Result, Violations, _),
     format('{"result":"~w","violations":[', [Result]),

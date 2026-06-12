@@ -206,7 +206,7 @@ class TestPrologValidator:
     def test_ultrapassar_carga_semanal(self):
         atleta = {
             "profile": {"level": "beginner"},
-            "physical_restrictions": {"injury_region": "none"},
+            "physical_restrictions": {"injury_region": ["none"]},
             "availability": {
                 "available_days": ["monday","tuesday","wednesday","friday","sunday"],
                 "minutes_per_day": 90
@@ -219,14 +219,14 @@ class TestPrologValidator:
                 "name": "Depth Jumps",
                 "intensity_range": [4, 5],
                 "contraindications": ["knee"],
-                "recovery_cost": 2
+                "recovery_cost": 5
             },
             {
                 "id": "shooting_catch_and_shoot",
                 "name": "lançamento",
                 "intensity_range": [4, 5],
-                "contraindications": "none",
-                "recovery_cost": 2
+                "contraindications": [],
+                "recovery_cost": 5
             }
         ]
         

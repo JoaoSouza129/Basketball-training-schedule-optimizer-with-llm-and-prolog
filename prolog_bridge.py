@@ -129,7 +129,7 @@ def validate_plan(athlete: dict, plan: dict, catalog: list) -> dict:
         print("=== STDERR ===")
         print(result.stderr)
         print("================")
-        
+        print("=== RETURN CODE ===", result.returncode)
         output = result.stdout.strip()
         if not output:
             raise Exception("Prolog não devolveu output")
