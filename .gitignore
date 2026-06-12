@@ -1,5 +1,5 @@
 # Python
-__pycache__/
+__pycache__
 *.py[cod]
 *.pyo
 *.pyd
@@ -15,7 +15,7 @@ env/
 secrets.json
 
 # IDEs
-.vscode/
+.vscode
 .idea/
 
 # Ficheiros temporários Prolog
