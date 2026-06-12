@@ -109,7 +109,7 @@ check_blocks_in_catalog :-
         (   session(_, Blocks),
             member(block(BlockId, _, _, _), Blocks)
         ),
-        (   block_catalog(BlockId, _, _)
+        (   block_catalog(BlockId, _, _, _, _)
         ->  true
         ;   assert(violation(unknown_block, BlockId, 0, 0))
         )
