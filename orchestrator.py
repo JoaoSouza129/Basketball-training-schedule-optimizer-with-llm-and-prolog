@@ -57,7 +57,7 @@ def pipeline_principal(user_input: dict):
         
         user_prompt = gerar_user_prompt(atleta, blocos, feedback_anterior)
         plano = call_llm(system_prompt, user_prompt)
-        
+        print(user_prompt)
         plano=completar_plano(plano)
         print("[VALIDANDO] Enviando plano para validação Prolog...")
         resultado = validate_plan(atleta, plano, blocos)
@@ -85,14 +85,14 @@ def completar_plano(plan: dict) -> dict:
 
 if __name__ == "__main__":
     user_input = {
-        "profile": {"level": "intermediate", "experience_years": 2},
-        "primary_goal": "shooting",
+        "profile": {"level": "beginner", "experience_years": 2},
+        "primary_goal": "conditioning",
         "availability": {
             "days_per_week": 3,
             "minutes_per_day": 60,
             "available_days": ["monday", "wednesday", "friday"]
         },
-        "physical_restrictions": {"has_injury": True, "injury_region": "knee"}
+        "physical_restrictions": {"has_injury": False, "injury_region": None}
     }
 
     plano_final = pipeline_principal(user_input)
