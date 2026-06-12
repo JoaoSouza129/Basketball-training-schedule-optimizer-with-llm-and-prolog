@@ -82,7 +82,7 @@ check_injury_contraindications :-
             member(block(BlockId, _, _, _), Blocks)
         ),
         (   % O Prolog tenta fazer o match direto da Region na 4ª posição do catálogo!
-            block_catalog(BlockId, _, _, Region, _)
+            block_catalog(BlockId, _, _, Region, _),
             \+ violation(blocked_block_due_to_injury, Day, BlockId, _)
         ->  assert(violation(blocked_block_due_to_injury, Day, BlockId, Region))
         ;   true
