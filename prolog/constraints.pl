@@ -9,7 +9,7 @@
 :- dynamic session/2.
 :- dynamic athlete/2.
 :- dynamic availability/2.
-
+:- dynamic soft_violation/4.
 % -----------------------------------------------------------
 % Utilitários
 % -----------------------------------------------------------
@@ -83,6 +83,7 @@ check_injury_contraindications :-
         ),
         (   % O Prolog tenta fazer o match direto da Region na 4ª posição do catálogo!
             block_catalog(BlockId, _, _, Region, _)
+            \+ violation(blocked_block_due_to_injury, Day, BlockId, _)
         ->  assert(violation(blocked_block_due_to_injury, Day, BlockId, Region))
         ;   true
         )
@@ -137,26 +138,47 @@ check_weekly_load_limit :-
     ->  assert(violation(weekly_load_exceeded, Total, MaxLoad, 0))
     ;   true
     ).
+
+    
+% -----------------------------------------------------------
+% Soft Violation 1 — Alta intensidade sem descanso no dia seguinte
+% (o plano é válido, mas subóptimo)
+% -----------------------------------------------------------
+check_soft_recovery :-
+    forall(
+        (   session(Day, _),
+            session_has_high_intensity(Day),
+            consecutive_days(Day, NextDay),
+            \+ rest_day(NextDay)          % dia seguinte NÃO é descanso
+        ),
+        assert(soft_violation(recommend_rest_after_high_intensity, Day, NextDay, 0))
+    ).
+
 % -----------------------------------------------------------
 % Predicado principal de validação
 % -----------------------------------------------------------
 validate_plan(Result, Violations, SoftViolations) :-
     retractall(violation(_,_,_,_)),
-
+    retractall(soft_violation(_,_,_,_)),
     check_daily_time_limit,
     check_no_consecutive_high_intensity,
     check_injury_contraindications,
     check_minimum_rest,
     check_blocks_in_catalog,
     check_weekly_load_limit,
+    check_soft_recovery,
 
     findall(
         violation(Rule, Arg1, Arg2, Arg3),
         violation(Rule, Arg1, Arg2, Arg3),
         Violations
     ),
+    findall(
+        soft_violation(Rule, Arg1, Arg2, Arg3),
+        soft_violation(Rule, Arg1, Arg2, Arg3),
+        SoftViolations                     % ← já não é []
+    ),
     (   Violations = []
     ->  Result = valid
     ;   Result = invalid
-    ),
-    SoftViolations = [].
+    ).

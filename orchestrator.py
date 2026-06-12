@@ -57,7 +57,7 @@ def pipeline_principal(user_input: dict):
         
         user_prompt = gerar_user_prompt(atleta, blocos, feedback_anterior)
         plano = call_llm(system_prompt, user_prompt)
-        print(user_prompt)
+        
         plano=completar_plano(plano)
         print("[VALIDANDO] Enviando plano para validação Prolog...")
         resultado = validate_plan(atleta, plano, blocos)

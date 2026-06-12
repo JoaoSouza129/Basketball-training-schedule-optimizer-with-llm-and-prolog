@@ -4,12 +4,14 @@
 
 :- consult('constraints.pl').
 
-
 run_validation :-
-    validate_plan(Result, Violations, _),
+    validate_plan(Result, Violations, SoftViolations),
     format('{"result":"~w","violations":[', [Result]),
     write_violations(Violations),
+    write('],"soft_violations":['),
+    write_soft_violations(SoftViolations),
     write(']}').
+
 
 write_violations([]).
 write_violations([V]) :-
@@ -19,6 +21,16 @@ write_violations([V|Vs]) :-
     write(','),
     write_violations(Vs).
 
+
+write_soft_violations([]).
+write_soft_violations([V]) :-
+    write_soft_violation(V).
+write_soft_violations([V|Vs]) :-
+    write_soft_violation(V),
+    write(','),
+    write_soft_violations(Vs).
+
+
 write_violation(violation(Rule, A1, A2, A3)) :-
     format('{"rule":"~w","arg1":', [Rule]),
     write_json_value(A1),
@@ -27,6 +39,17 @@ write_violation(violation(Rule, A1, A2, A3)) :-
     write(',"arg3":'),
     write_json_value(A3),
     write('}').
+
+
+write_soft_violation(soft_violation(Rule, A1, A2, A3)) :-
+    format('{"rule":"~w","arg1":', [Rule]),
+    write_json_value(A1),
+    write(',"arg2":'),
+    write_json_value(A2),
+    write(',"arg3":'),
+    write_json_value(A3),
+    write('}').
+
 
 % Escreve um valor como JSON: números nus, átomos entre aspas
 write_json_value(V) :-

@@ -19,7 +19,7 @@ def plan_to_facts(athlete: dict, plan: dict) -> str:
     level=athlete["profile"]["level"]
     injury_region = athlete["physical_restrictions"]["injury_region"]
     if injury_region is None:
-        injury_atom = "null"
+        injury_atom = "none"
     else:
         injury_atom = injury_region
     facts.append(f"athlete(level({level}), injury({injury_atom})).")
@@ -130,6 +130,7 @@ def validate_plan(athlete: dict, plan: dict, catalog: list) -> dict:
         return {
             "is_valid": data["result"] == "valid",
             "violations": data["violations"],
+            "soft_violations": data.get("soft_violations", []),
             "raw_output": data
         }
 

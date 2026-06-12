@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
+.env
+
+# Variáveis de ambiente e segredos
+*.env
+secrets.json
+
+# IDEs
+.vscode/
+.idea/
+
+# Ficheiros temporários Prolog
+*.pl.tmp
+
+# Distribuição / packaging
+dist/
+build/
+*.egg-info/
+
+# Testes e cobertura
+.coverage
+htmlcov/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
