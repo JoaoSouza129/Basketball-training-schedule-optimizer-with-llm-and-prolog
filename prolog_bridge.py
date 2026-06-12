@@ -61,19 +61,19 @@ def catalog_to_facts(catalog: list) -> list:
     facts = []
     for block in catalog:
         block_id = block["id"]
-        block_name = repr(block["name"])  # Escapa aspas automaticamente
+        block_name = repr(block["name"])
         min_int, max_int = block["intensity_range"]
-        contraindications = ", ".join(block["contraindications"])
         recovery = block["recovery_cost"]
-
-        fact = (
-            f"block_catalog({block_id}, {block_name}, ["
-            f"intensity_range({min_int}, {max_int}), "
-            f"contraindications([{contraindications}]), "
-            f"recovery_cost({recovery})"
-            "])."
-        )
-        facts.append(fact)
+        
+        contras = block["contraindications"]
+        if not contras:
+            fact = f"block_catalog({block_id}, {block_name}, {min_int}, {max_int}, none, {recovery})."
+            facts.append(fact)
+        else:
+            for contra in contras:
+                fact = f"block_catalog({block_id}, {block_name}, {min_int}, {max_int}, {contra}, {recovery})."
+                facts.append(fact)
+                
     return facts
 
 def validate_plan(athlete: dict, plan: dict, catalog: list) -> dict:

@@ -82,18 +82,14 @@ check_injury_contraindications :-
         (   session(Day, Blocks),
             member(block(BlockId, _, _, _), Blocks)
         ),
-        (   block_catalog(BlockId, _, Attrs),
-            member(contraindications(Contras), Attrs),
-            (   member(Region, Contras)
-            ->  assert(violation(blocked_block_due_to_injury, Day, BlockId, Region))
-            ;   true
-            )
+        (   block_catalog(BlockId, _, _, _, Region, _)
+        ->  assert(violation(blocked_block_due_to_injury, Day, BlockId, Region))
+        ;   true
         )
     ).
 
 check_injury_contraindications :-
     athlete(_, injury(none)).
-
 % -----------------------------------------------------------
 % Regra 4 — Mínimo de 1 dia de descanso
 % -----------------------------------------------------------
@@ -132,8 +128,8 @@ check_weekly_load_limit :-
     findall(Cost, (
         session(_, Blocks),
         member(block(Id, Dur, _, _), Blocks),
-        block_catalog(Id, _, Attrs),
-        member(recovery_cost(BaseCost), Attrs),
+        % Usamos um underscore (_) na contraindicação porque aqui não nos interessa!
+        block_catalog(Id, _, _, _, _, BaseCost),
         Cost is BaseCost * Dur / 15
     ), Costs),
     sumlist(Costs, Total),
@@ -141,7 +137,6 @@ check_weekly_load_limit :-
     ->  assert(violation(weekly_load_exceeded, Total, MaxLoad, 0))
     ;   true
     ).
-
 % -----------------------------------------------------------
 % Predicado principal de validação
 % -----------------------------------------------------------
