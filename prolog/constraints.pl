@@ -2,14 +2,13 @@
 % constraints.pl - Regras Hard de validação de planos de treino
 % ============================================================
 
+%:- dynamic goal/2.
+:- dynamic block_catalog/5.
 :- dynamic violation/4.
 :- dynamic rest_day/1.
 :- dynamic session/2.
 :- dynamic athlete/2.
 :- dynamic availability/2.
-:- dynamic goal/2.
-:- dynamic block_catalog/3.
-
 
 % -----------------------------------------------------------
 % Utilitários
@@ -82,7 +81,8 @@ check_injury_contraindications :-
         (   session(Day, Blocks),
             member(block(BlockId, _, _, _), Blocks)
         ),
-        (   block_catalog(BlockId, _, _, _, Region, _)
+        (   % O Prolog tenta fazer o match direto da Region na 4ª posição do catálogo!
+            block_catalog(BlockId, _, _, Region, _)
         ->  assert(violation(blocked_block_due_to_injury, Day, BlockId, Region))
         ;   true
         )
@@ -128,8 +128,8 @@ check_weekly_load_limit :-
     findall(Cost, (
         session(_, Blocks),
         member(block(Id, Dur, _, _), Blocks),
-        % Usamos um underscore (_) na contraindicação porque aqui não nos interessa!
-        block_catalog(Id, _, _, _, _, BaseCost),
+        % Ignoramos as intensidades e a lesão usando o underscore (_), extraindo direto o BaseCost
+        block_catalog(Id, _, _, _, BaseCost),
         Cost is BaseCost * Dur / 15
     ), Costs),
     sumlist(Costs, Total),

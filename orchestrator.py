@@ -86,7 +86,7 @@ def completar_plano(plan: dict) -> dict:
 if __name__ == "__main__":
     user_input = {
         "profile": {"level": "intermediate", "experience_years": 2},
-        "primary_goal": "plyometrics",
+        "primary_goal": "shooting",
         "availability": {
             "days_per_week": 3,
             "minutes_per_day": 60,

@@ -61,17 +61,16 @@ def catalog_to_facts(catalog: list) -> list:
     facts = []
     for block in catalog:
         block_id = block["id"]
-        block_name = repr(block["name"])
         min_int, max_int = block["intensity_range"]
         recovery = block["recovery_cost"]
-        
-        contras = block["contraindications"]
+        contras = block.get("contraindications", [])
+      
         if not contras:
-            fact = f"block_catalog({block_id}, {block_name}, {min_int}, {max_int}, none, {recovery})."
+            fact = f"block_catalog({block_id}, {min_int}, {max_int}, none, {recovery})."
             facts.append(fact)
         else:
             for contra in contras:
-                fact = f"block_catalog({block_id}, {block_name}, {min_int}, {max_int}, {contra}, {recovery})."
+                fact = f"block_catalog({block_id}, {min_int}, {max_int}, {contra}, {recovery})."
                 facts.append(fact)
                 
     return facts
@@ -79,18 +78,17 @@ def catalog_to_facts(catalog: list) -> list:
 def validate_plan(athlete: dict, plan: dict, catalog: list) -> dict:
     # 1. Verifica se os ids dos blocos são validos
     valid_ids = {block["id"] for block in catalog}
-   
-    for day, day_data in plan["weekly_plan"].items():
-        if day_data is not None:
-            for block in day_data.get("sessions", []):
-                b_id = block.get("block_id")
-                if b_id not in valid_ids:
-                    return {
-                        "is_valid": False,
-                        "violations": [{"rule": "unknown_block", "arg1": b_id, "arg2": 0, "arg3": 0}],
-                        "raw_output": {}
-                    }
-    
+    for day, day_data in plan.get("weekly_plan", {}).items():
+            if day_data is not None:
+                for block in day_data.get("sessions", []):
+                    # Compatibilidade de chaves para evitar None inesperado
+                    b_id = block.get("block_id") or block.get("id") or block.get("block")
+                    if b_id not in valid_ids:
+                        return {
+                            "is_valid": False,
+                            "violations": [{"rule": "unknown_block", "arg1": b_id, "arg2": 0, "arg3": 0}],
+                            "raw_output": {}
+                        }
     # 2. Resolução de caminhos absolutos (Segurança de caminhos e concorrência)
     project_root = os.path.abspath(os.getcwd())
     constraints_abs = os.path.join(project_root, "prolog", "constraints.pl").replace("\\", "/")
