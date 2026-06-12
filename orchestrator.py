@@ -40,13 +40,12 @@ def pipeline_principal(user_input: dict):
     blocos = FULL_CATALOG
 
     # 3. Pré-checar viabilidade
-    """problemas = check_feasibility(atleta, blocos)
+    problemas = check_feasibility(atleta, blocos)
     if problemas:
         print("Não foi possível gerar plano. Erros encontrados:")
         for erro in problemas:
             print(f" - {erro}")
         return None
-"""
     # 4. Carregar prompt do sistema
     system_prompt = load_system_prompt()
 

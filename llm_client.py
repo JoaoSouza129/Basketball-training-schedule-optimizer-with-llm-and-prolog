@@ -89,4 +89,11 @@ def call_llm_hf(system_prompt: str, user_prompt: str) -> dict:
         seed=42,
     )
     
-    return response.choices[0].message.content
+
+    json_str = response.choices[0].message.content.strip()
+
+    # Tentar parsear o JSON
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"LLM devolveu JSON inválido: {json_str}") from e

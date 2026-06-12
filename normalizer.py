@@ -38,7 +38,7 @@ def _normalize_equipment(raw_equipment: list) -> list:
     for item in raw_equipment:
         mapped = EQUIPMENT_MAP.get(item.lower(), item.lower().replace(" ", "_"))
         if mapped not in full_equipment:
-            full_equipment.append(mapped)
+            full_equipment.add(mapped)
     
     return list(full_equipment)
 
@@ -103,7 +103,7 @@ def normalize_input(raw: dict) -> dict:
         "competition_day": raw.get("competition_day", None),
         "initial_metrics": raw.get("initial_metrics", None),
     }
-    raw_equipment = raw.get("equipment", [])
-    normalized["equipment"] = _normalize_equipment(raw_equipment)
+    
+   
 
     return normalized
