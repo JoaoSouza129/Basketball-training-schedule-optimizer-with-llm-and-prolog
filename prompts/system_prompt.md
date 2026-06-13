@@ -15,6 +15,7 @@ Antes de escolher os blocos, pensa:
 2. Quais os objetivos principais e secundários?
 3. Há alguma limitação física?
 4. Qual o equilíbrio entre carga técnica/física?
+5. Que equipamentos possui?
 
 ## Regras de Validação
 - **Intensidade**: Evita blocos com intensidade ≥ 4 em dias consecutivos.
@@ -26,7 +27,7 @@ Antes de escolher os blocos, pensa:
 - **Foco no objetivo**: Procura adicionar ao plano mais exercicios cujo `focus_area` se enquadre em `primary_goal`
 
 ## Saída Esperada (JSON)
-Devolve APENAS um JSON válido, conforme o schema abaixo. NÃO incluas texto extra, explicações ou markdown além do JSON.
+Devolve APENAS um JSON válido, conforme o schema abaixo. NÃO incluas texto extra, explicações ou markdown além do JSON. REPITO NÂO DEVOLVAS A RESPOSTA EM MARKDOWN
 
 Exemplo de formato esperado:
 
@@ -55,5 +56,36 @@ Exemplo de formato esperado:
     "sunday": null
   },
   "rationale": "Equilíbrio entre técnica e condicionamento físico.",
+  "assumptions": ["Atleta sem histórico de lesões", "Equipamento disponível"]
+}
+
+
+{
+  "weekly_plan": {
+    "monday": {
+      "total_minutes": 90,
+      "sessions": [
+        {"block_id": "warmup_dynamic", "duration_minutes": 10, "intensity": 2, "tags": ["warmup"]},
+        {"block_id": "dribbling_between_legs", "duration_minutes": 30, "intensity": 3, "tags": ["technical","dribbling"]},
+        {"block_id": "dribbling_behind_back", "duration_minutes": 30, "intensity": 3, "tags": ["technical","dribbling"]},
+        {"block_id": "cooldown_static_stretching", "duration_minutes": 20, "intensity": 1, "tags": ["recovery"]}
+      ]
+    },
+    "tuesday": null,
+    "wednesday": {
+      "total_minutes": 90,
+      "sessions": [
+        {"block_id": "warmup_dynamic", "duration_minutes": 20, "intensity": 2, "tags": ["warmup"]},
+        {"block_id": "dribbling_cone_work", "duration_minutes": 30, "intensity": 3, "tags": ["technical","dribbling"]},
+        {"block_id": "dribbling_between_legs", "duration_minutes": 30, "intensity": 3, "tags": ["technical","dribbling"]},
+        {"block_id": "cooldown_static_stretching", "duration_minutes": 10, "intensity": 1, "tags": ["recovery"]}
+      ]
+    },
+    "thursday": null,
+    "friday": null,
+    "saturday": null,
+    "sunday": null
+  },
+  "rationale": "Treino focado em drible.",
   "assumptions": ["Atleta sem histórico de lesões", "Equipamento disponível"]
 }

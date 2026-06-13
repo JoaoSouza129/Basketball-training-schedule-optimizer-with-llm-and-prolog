@@ -14,7 +14,10 @@ class ValidationResult:
 
 def plan_to_facts(athlete: dict, plan: dict) -> str:
     facts=[]
-    
+    # Dentro de plan_to_facts(athlete, plan)
+    eqs = athlete.get("equipment", ["none"])
+    eqs_prolog = ", ".join(eqs)
+    facts.append(f"athlete_equipment([{eqs_prolog}]).")
     # Passo A: Factos dos atletas (level, injury)
     level=athlete["profile"]["level"]
     injury_region = athlete["physical_restrictions"]["injury_region"]
@@ -64,13 +67,14 @@ def catalog_to_facts(catalog: list) -> list:
         min_int, max_int = block["intensity_range"]
         recovery = block["recovery_cost"]
         contras = block.get("contraindications", [])
-      
+        equip_req = block.get("required_equipment") or "none"
+        
         if not contras:
-            fact = f"block_catalog({block_id}, {min_int}, {max_int}, none, {recovery})."
+            fact = f"block_catalog({block_id}, {min_int}, {max_int}, none, {equip_req}, {recovery})."
             facts.append(fact)
         else:
             for contra in contras:
-                fact = f"block_catalog({block_id}, {min_int}, {max_int}, {contra}, {recovery})."
+                fact = f"block_catalog({block_id}, {min_int}, {max_int}, {contra}, {equip_req}, {recovery})."
                 facts.append(fact)
                 
     return facts
@@ -99,8 +103,8 @@ def validate_plan(athlete: dict, plan: dict, catalog: list) -> dict:
         # Debug opcional (Seguro contra falhas de IO)
         with open(facts_file, 'r', encoding='utf-8') as ficheiro:
             conteudo = ficheiro.read()
-            print("=== FACTS FILE CONTENT ===")
-            print(conteudo)
+            #print("=== FACTS FILE CONTENT ===")
+            #print(conteudo)
 
         # 5. Chamar o SWI-Prolog
         result = subprocess.run(

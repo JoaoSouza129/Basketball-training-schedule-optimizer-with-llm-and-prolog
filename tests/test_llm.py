@@ -3,7 +3,7 @@ import sys
 import os
 import json
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from llm_client import call_llm
+from llm_client import call_llm, call_llm_ollama_cloud
 from load_system_prompt import load_system_prompt
 
 athlete_mock = {
@@ -50,5 +50,5 @@ user_prompt = f"""
 
 system_prompt = load_system_prompt()
 
-result = call_llm(system_prompt, user_prompt)
+result = call_llm_ollama_cloud(system_prompt, user_prompt)
 print(json.dumps(result, indent=2, ensure_ascii=False))

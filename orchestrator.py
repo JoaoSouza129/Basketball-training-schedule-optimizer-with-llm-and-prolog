@@ -3,13 +3,14 @@
 import os
 import sys
 import json
+from collections import Counter
 
 # Adicionar o diretório pai ao path (se necessário)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from normalizer import normalize_input
 from catalog_loader import check_feasibility, get_eligible_blocks, load_catalog
-from llm_client import call_llm, gerar_user_prompt, call_llm_hf
+from llm_client import call_llm, gerar_user_prompt, call_llm_ollama_cloud
 from prolog_bridge import validate_plan
 from load_system_prompt import load_system_prompt
 from score_calculator import calculate_score
@@ -25,8 +26,35 @@ def formatar_violacoes_para_llm(violacoes: list) -> str:
         arg1 = v.get("arg1", "")
         arg2 = v.get("arg2", "")
         arg3 = v.get("arg3", "")
-        linhas.append(f"- Regra '{regra}' no dia '{arg1}'. Valor atual: {arg2}, Limite: {arg3}")
+        if regra == "weekly_load_exceeded":
+            linhas.append(f"- [Carga Excedida] A carga total gerada foi {arg1}, mas o limite para o nível do atleta é {arg2}.")
+        elif regra == "daily_time_exceeded":
+            linhas.append(f"- [Tempo Excedido] No dia '{arg1}', o treino totalizou {arg2} minutos, ultrapassando o limite diário de {arg3} minutos.")
+        elif regra == "blocked_block_due_to_injury":
+            linhas.append(f"- [Restrição de Lesão] No dia '{arg1}', utilizaste o bloco '{arg2}' que é proibido devido à lesão na região '{arg3}'.")
+        elif regra == "missing_equipment":
+            linhas.append(f"- [Equipamento em Falta] No dia '{arg1}', tentaste usar o bloco '{arg2}', mas o atleta não tem o equipamento exigido: '{arg3}'.")
+        else:
+            linhas.append(f"- Violação da regra '{regra}': {arg1}, {arg2}, {arg3}")
+        
     return "\n".join(linhas)
+
+
+def construir_feedback_estruturado(violations: list, historico_violacoes: list) -> dict:
+    regras_atuais = [v.get("rule", "desconhecida") for v in violations]
+    contagem_historica = Counter(historico_violacoes + regras_atuais)
+    repetidas = [regra for regra, count in contagem_historica.items() if count > 1]
+
+    return {
+        "status": "rejeitado",
+        "violacoes_atuais": violations,
+        "regras_repetidas": repetidas,
+        "contagem_por_regra": dict(contagem_historica),
+        "instrucao": (
+            "Corrige as violacoes atuais. Se alguma regra ja se repetiu, muda a estrategia do plano "
+            "em vez de apenas trocar um bloco por outro semelhante."
+        ),
+    }
 
 
 
@@ -36,7 +64,7 @@ def pipeline_principal(user_input: dict):
     # 1. Normalizar input
     atleta = normalize_input(user_input)
 
-    # 2. Obter blocos elegíveis
+    # 2. Obter blocos 
     blocos = FULL_CATALOG
 
     # 3. Pré-checar viabilidade
@@ -51,11 +79,12 @@ def pipeline_principal(user_input: dict):
 
     # 5. Loop de tentativas
     feedback_anterior = ""
+    historico_violacoes = []
     for tentativa in range(1, MAX_TENTATIVAS + 1):
         print(f"\n[TENTATIVA {tentativa}] Solicitando plano ao LLM...")
         
         user_prompt = gerar_user_prompt(atleta, blocos, feedback_anterior)
-        plano = call_llm(system_prompt, user_prompt)
+        plano = call_llm_ollama_cloud(system_prompt, user_prompt)
         
         plano=completar_plano(plano)
         print("[VALIDANDO] Enviando plano para validação Prolog...")
@@ -66,7 +95,14 @@ def pipeline_principal(user_input: dict):
             return plano
         else:
             print("❌ Plano inválido. Preparando feedback...")
-            feedback_anterior = formatar_violacoes_para_llm(resultado["violations"])
+            feedback_estruturado = construir_feedback_estruturado(
+                resultado["violations"],
+                historico_violacoes,
+            )
+            historico_violacoes.extend(
+                violacao.get("rule", "desconhecida") for violacao in resultado["violations"]
+            )
+            feedback_anterior = feedback_estruturado
 
     print("⚠️ Número máximo de tentativas atingido. Retornando último plano.")
     return plano
@@ -91,7 +127,8 @@ if __name__ == "__main__":
             "minutes_per_day": 60,
             "available_days": ["monday", "wednesday", "friday"]
         },
-        "physical_restrictions": {"has_injury": False, "injury_region": None}
+        "physical_restrictions": {"has_injury": False, "injury_region": None},
+        "equipment": []
     }
 
     plano_final = pipeline_principal(user_input)

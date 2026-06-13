@@ -12,9 +12,15 @@ st.markdown("Insira os dados do atleta e obtenha um plano semanal otimizado.")
 
 # Campos do formulário
 nivel = st.selectbox("Nível", ["beginner", "intermediate", "advanced"])
-objetivo = st.selectbox("Objetivo Principal", ["shooting", "conditioning", "defense"])
+objetivo = st.selectbox("Objetivo Principal", ["shooting", "conditioning", "defense", "dribbling"])
 dias = st.multiselect("Dias disponíveis", ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"])
 minutos = st.slider("Minutos por dia", 30, 120, 60)
+tem_lesao = st.checkbox("Tem alguma lesão ativa?")
+regiao_lesao = None
+if tem_lesao:
+    regiao_lesao = st.selectbox("Região da Lesão", ["knee", "ankle", "shoulder"])
+equipamentos = st.multiselect("Equipamentos Disponíveis", ["bola pesada", "cones", "faixa elástica", "halteres", "caixa ou step"])
+
 
 # Botão para gerar plano
 if st.button("Gerar Plano"):
@@ -26,7 +32,8 @@ if st.button("Gerar Plano"):
             "available_days": dias,
             "minutes_per_day": minutos
         },
-        "physical_restrictions": {"has_injury": False, "injury_region": None}
+        "physical_restrictions": {"has_injury": tem_lesao, "injury_region": regiao_lesao},
+        "equipment": equipamentos if equipamentos else []
     }
 
     with st.spinner("A gerar plano..."):

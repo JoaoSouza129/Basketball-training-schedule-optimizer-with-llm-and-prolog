@@ -9,16 +9,20 @@ with open(SCHEMA_PATH, encoding="utf-8") as f:
 # Mapeamento de nomes amigáveis → IDs do catálogo
 EQUIPMENT_MAP = {
     "2 basketballs": "basketball",
+    "bola": "basketball",
     "cones": "cones",
     "resistance bands": "resistance_bands",
+    "faixa elástica": "resistance_bands",
     "weights": "weights",
     "heavy ball": "heavy_ball",
     "bola pesada": "heavy_ball",
     "halteres": "weights",
     "court": "court",
     "basket": "basket",
-    "box or step": "box_or_step",
+    "cesto": "basket",
+    "caixa ou step": "box_or_step",
     "foam roller": "foam_roller",
+    "rolo": "foam_roller",
 }
 
 
@@ -27,7 +31,7 @@ def _normalize_equipment(raw_equipment: list) -> list:
     """Converte nomes amigáveis para IDs do catálogo."""
     default_equipment = ["basketball", "court", "basket"]
     
-    if not raw_equipment:
+    if not raw_equipment or raw_equipment==[]:
         return default_equipment
     
     # Garantir que os defaults estão lá, mesmo que o user tenha enviado outros

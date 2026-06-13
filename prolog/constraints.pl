@@ -1,15 +1,17 @@
 % ============================================================
-% constraints.pl - Regras Hard de validação de planos de treino
+% constraints.pl - Regras Hard e Soft de validação de planos de treino
 % ============================================================
 
-%:- dynamic goal/2.
-:- dynamic block_catalog/5.
+
 :- dynamic violation/4.
 :- dynamic rest_day/1.
 :- dynamic session/2.
 :- dynamic athlete/2.
 :- dynamic availability/2.
 :- dynamic soft_violation/4.
+:- dynamic block_catalog/6.
+:- dynamic athlete_equipment/1.
+
 % -----------------------------------------------------------
 % Utilitários
 % -----------------------------------------------------------
@@ -82,7 +84,7 @@ check_injury_contraindications :-
             member(block(BlockId, _, _, _), Blocks)
         ),
         (   % O Prolog tenta fazer o match direto da Region na 4ª posição do catálogo!
-            block_catalog(BlockId, _, _, Region, _),
+            block_catalog(BlockId, _, _, Region, _, _),
             \+ violation(blocked_block_due_to_injury, Day, BlockId, _)
         ->  assert(violation(blocked_block_due_to_injury, Day, BlockId, Region))
         ;   true
@@ -110,7 +112,7 @@ check_blocks_in_catalog :-
         (   session(_, Blocks),
             member(block(BlockId, _, _, _), Blocks)
         ),
-        (   block_catalog(BlockId, _, _, _, _)
+        (   block_catalog(BlockId, _, _, _, _, _)
         ->  true
         ;   assert(violation(unknown_block, BlockId, 0, 0))
         )
@@ -130,7 +132,7 @@ check_weekly_load_limit :-
         session(_, Blocks),
         member(block(Id, Dur, _, _), Blocks),
         % Ignoramos as intensidades e a lesão usando o underscore (_), extraindo direto o BaseCost
-        block_catalog(Id, _, _, _, BaseCost),
+        block_catalog(Id, _, _, _, _,BaseCost),
         Cost is BaseCost * Dur / 15
     ), Costs),
     sumlist(Costs, Total),
@@ -138,7 +140,33 @@ check_weekly_load_limit :-
     ->  assert(violation(weekly_load_exceeded, Total, MaxLoad, 0))
     ;   true
     ).
-
+% -----------------------------------------------------------
+% Regra 7 — Verificar se o atleta possui o equipamento exigido
+% -----------------------------------------------------------
+check_equipment_availability :-
+    athlete_equipment(AvailableList),
+    forall(
+        (   session(Day, Blocks),
+            member(block(BlockId, _, _, _), Blocks)
+        ),
+        (   % 1:Id, 2:Min, 3:Max, 4:Contra, 5:EquipExigido, 6:_
+            block_catalog(BlockId, _, _, _, RequiredEquip, _)
+        ->  (   RequiredEquip == none
+            ->  true
+            ;   (   is_list(RequiredEquip)
+                ->  (   forall(member(Equip, RequiredEquip), member(Equip, AvailableList))
+                    ->  true
+                    ;   assert(violation(missing_equipment, Day, BlockId, RequiredEquip))
+                    )
+                ;   (   member(RequiredEquip, AvailableList)
+                    ->  true
+                    ;   assert(violation(missing_equipment, Day, BlockId, RequiredEquip))
+                    )
+                )
+            )
+        ;   true
+        )
+    ).
     
 % -----------------------------------------------------------
 % Soft Violation 1 — Alta intensidade sem descanso no dia seguinte
@@ -166,6 +194,7 @@ validate_plan(Result, Violations, SoftViolations) :-
     check_minimum_rest,
     check_blocks_in_catalog,
     check_weekly_load_limit,
+    check_equipment_availability,
     check_soft_recovery,
 
     findall(

@@ -1,19 +1,47 @@
 import json
-from groq import Groq
 import dotenv
 import sys
 import os
-from huggingface_hub import InferenceClient
+import urllib.error
+import urllib.request
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 dotenv.load_dotenv()
 API_KEY=os.getenv("GROQ_API_KEY")
-HF_API_KEY=os.getenv("HF-API-KEY")
+OLLAMA_API_KEY=os.getenv("OLLAMA-API-KEY")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-20b:free")
+OPENROUTER_API_KEY=os.getenv("OPENROUTER-API-KEY")
+OLLAMA_HOST = "http://localhost:11434"
+OLLAMA_CLOUD_MODEL =  "gemma3:12b-cloud"
+OLLAMA_CLOUD_API_KEY = os.getenv("OLLAMA-API-KEY")
 
 # Carrega o schema JSON
 def load_output_schema() -> dict:
     schema_path = os.path.join(os.path.dirname(__file__), "schemas", "output_schema.json")
     with open(schema_path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _extract_json_text(raw_text: str) -> str:
+    text = raw_text.strip()
+
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].lstrip().startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+
+    if text.lower().startswith("json"):
+        text = text[4:].lstrip()
+
+    first_object = text.find("{")
+    last_object = text.rfind("}")
+    if first_object != -1 and last_object != -1 and last_object > first_object:
+        text = text[first_object : last_object + 1]
+
+    return text
 
 def gerar_user_prompt(atleta: dict, blocos: list, feedback_anterior: str = "") -> str:
     objetivo = atleta["primary_goal"]
@@ -37,16 +65,28 @@ def gerar_user_prompt(atleta: dict, blocos: list, feedback_anterior: str = "") -
     """
 
     if feedback_anterior:
+        feedback_texto = feedback_anterior
+        if isinstance(feedback_anterior, dict):
+            feedback_texto = json.dumps(feedback_anterior, indent=2, ensure_ascii=False)
+
         prompt += f"""
 ### Feedback da Tentativa Anterior
-O plano anterior foi rejeitado pelas seguintes razões:
-{feedback_anterior}
-Por favor corrige esses erros e gera um novo plano.
+O plano anterior foi rejeitado. Usa esta informação como contexto obrigatório para corrigir a próxima resposta:
+```json
+{feedback_texto}
+```
+
+### Instrução de Correção
+- Corrige todas as violações listadas no feedback.
+- Se a mesma regra aparecer repetida, altera a estratégia do plano e não apenas o bloco isolado.
+- Mantém o output estritamente em JSON válido.
 """
 
     return prompt
 
 def call_llm(system_prompt: str, user_prompt: str)->dict:
+    from groq import Groq
+
     client=Groq(api_key=API_KEY)
     schema = load_output_schema()
     
@@ -64,36 +104,150 @@ def call_llm(system_prompt: str, user_prompt: str)->dict:
         }
     )
     # Extrair o conteúdo do assistant
-    json_str = response.choices[0].message.content.strip()
+    json_str = _extract_json_text(response.choices[0].message.content)
 
     # Tentar parsear o JSON
     try:
         return json.loads(json_str)
     except json.JSONDecodeError as e:
         raise ValueError(f"LLM devolveu JSON inválido: {json_str}") from e
-        
-def call_llm_hf(system_prompt: str, user_prompt: str) -> dict:
-    client = InferenceClient(
-        model="meta-llama/Llama-3.1-8B-Instruct",
-        token=HF_API_KEY
-    )
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
 
-    response = client.chat_completion(
-        messages=messages,
-        max_tokens=8192,
+"""
+def _call_openrouter_chat(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    model: str,
+    api_key: str = "",
+    temperature: float = 0.1,
+    num_predict: int = 8192,
+) -> dict:
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "stream": False,
+        "temperature": temperature,
+        "max_tokens": num_predict,
+        "response_format": {"type": "json_object"},
+    }
+
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+   
+    request = urllib.request.Request(
+        f"{OPENROUTER_BASE_URL.rstrip('/')}/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            print(f"Resposta do modelo {model}: \n")
+            response_payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Falha ao chamar o OpenRouter ({e.code}): {error_body}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(
+            f"Nao foi possivel conectar ao OpenRouter em {OPENROUTER_BASE_URL}. Verifique a configuracao da API."
+        ) from e
+
+    json_str = _extract_json_text(
+        response_payload.get("choices", [{}])[0].get("message", {}).get("content", "")
+    )
+
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"LLM devolveu JSON inválido: {json_str}") from e
+
+
+def call_llm_openrouter(system_prompt: str, user_prompt: str) -> dict:
+    return _call_openrouter_chat(
+        system_prompt,
+        user_prompt,
+        model=OPENROUTER_MODEL,
+        api_key=OPENROUTER_API_KEY,
         temperature=0.1,
+        num_predict=8192,
+    )
+
+"""
+
+
+
+
+def _call_ollama_chat(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    host: str,
+    model: str,
+    api_key: str = "",
+    temperature: float = 0.1,
+    num_predict: int = 8192,
+    seed: int = 42,
+) -> dict:
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "stream": False,
+        "format": "json",
+        "options": {
+            "temperature": temperature,
+            "num_predict": num_predict,
+            "seed": seed,
+        },
+    }
+
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    request = urllib.request.Request(
+        f"{host.rstrip('/')}/api/chat",
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            response_payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Falha ao chamar o Ollama ({e.code}): {error_body}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(
+            f"Nao foi possivel conectar ao Ollama em {host}. Verifique se o servico esta ativo."
+        ) from e
+
+    json_str = _extract_json_text(response_payload.get("message", {}).get("content", ""))
+
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"LLM devolveu JSON inválido: {json_str}") from e
+
+      
+
+
+def call_llm_ollama_cloud(system_prompt: str, user_prompt: str) -> dict:
+    return _call_ollama_chat(
+        system_prompt,
+        user_prompt,
+        host=OLLAMA_HOST,
+        model=OLLAMA_CLOUD_MODEL,
+        api_key=OLLAMA_API_KEY,
+        temperature=0.1,
+        num_predict=8192,
         seed=42,
     )
-    
-
-    json_str = response.choices[0].message.content.strip()
-
-    # Tentar parsear o JSON
-    try:
-        return json.loads(json_str)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"LLM devolveu JSON inválido: {json_str}") from e
