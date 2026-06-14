@@ -12,7 +12,7 @@ st.markdown("Insira os dados do atleta e obtenha um plano semanal otimizado.")
 
 # Campos do formulário
 nivel = st.selectbox("Nível", ["beginner", "intermediate", "advanced"])
-objetivo = st.selectbox("Objetivo Principal", ["shooting", "conditioning", "defense", "dribbling"])
+objetivo = st.selectbox("Objetivo Principal", ["shooting", "conditioning", "defense", "dribbling","strength"])
 dias = st.multiselect("Dias disponíveis", ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"])
 minutos = st.slider("Minutos por dia", 30, 120, 60)
 tem_lesao = st.checkbox("Tem alguma lesão ativa?")
