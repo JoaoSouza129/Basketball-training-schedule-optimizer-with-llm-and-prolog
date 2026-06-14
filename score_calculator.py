@@ -86,69 +86,71 @@ def evaluate_distribution(plan:dict, available_days:int)->int:
 
     return max(0, score)
             
-def calculate_intesity_progression(plan:dict)->int:
+def calculate_intensity_progression(plan: dict) -> int:
     DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-    score = 20
+    score = 10  
+    weekly_plan = plan.get("weekly_plan", {})
+
     intensity_history = []
-    weekly_plan=plan.get("weekly_plan", {})
-    # 1. Construir série de intensidade diária
     for day in DAYS:
         obj = weekly_plan.get(day)
         if obj is None:
             intensity_history.append(0)
         else:
-            # Média ponderada da intensidade dos blocos
-            total_duration = sum(s.get("duration_minutes", 0) for s in obj.get("sessions", []))
-            weighted_sum = sum(
+            total_dur = sum(s.get("duration_minutes", 0) for s in obj.get("sessions", []))
+            w_sum = sum(
                 s.get("intensity", 0) * s.get("duration_minutes", 0)
                 for s in obj.get("sessions", [])
             )
-            avg_intensity = weighted_sum / total_duration if total_duration > 0 else 0
-            intensity_history.append(avg_intensity)
+            intensity_history.append(w_sum / total_dur if total_dur > 0 else 0)
 
-    # 2. Analisar sequências de alta intensidade
     for i in range(len(intensity_history) - 1):
         curr = intensity_history[i]
-        next_day = intensity_history[i + 1]
+        nxt  = intensity_history[i + 1]
 
-        # Penalizar se dois dias seguidos com intensidade >= 4
-        if curr >= 4 and next_day >= 4:
-            score -= 3
+        # Recompensar descanso após sessão intensa (o Prolog não cobre isto)
+        if curr >= 4 and nxt == 0:
+            score += 2
 
-        # Recompensar descanso após alta intensidade
-        if curr >= 4 and next_day == 0:
-            score += 1  # pequena recompensa
+        # Recompensar alternância: intenso → moderado (não só intenso → repouso)
+        if curr >= 4 and 0 < nxt < 3:
+            score += 1
 
-    return max(0, min(20, score))  # limitar entre 0 e 20
+        # Penalizar "tudo baixo" — plano sem nenhum pico de intensidade
+        # (sinaliza que o LLM foi demasiado conservador)
+
+    high_intensity_days = sum(1 for v in intensity_history if v >= 4)
+    training_days = sum(1 for v in intensity_history if v > 0)
+    if training_days > 0 and high_intensity_days / training_days < 0.20:
+        score -= 3  # nenhum dia exigente numa semana com vários treinos
+
+    return max(0, min(20, score))
+    
 def evaluate_time_efficiency(plan: dict, athlete: dict) -> int:
     score = 20
     minutos_por_dia = athlete["availability"]["minutes_per_day"]
     dias_treino = athlete["availability"]["available_days"]
-
     weekly = plan.get("weekly_plan", {})
-    ALL_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+    ALL_DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
 
     for day in ALL_DAYS:
         obj = weekly.get(day)
 
         if day not in dias_treino:
-            # Dia não disponível — penalizar se o LLM gerou sessão aqui
             if obj is not None:
-                score -= 5  # violação clara: sessão em dia não autorizado
+                score -= 5  # sessão em dia não autorizado — único gap real
             continue
 
-        # Dia disponível
         if obj is None:
-            # LLM não gerou sessão num dia disponível — penalizar levemente
             score -= 2
             continue
 
         minutos_planejados = obj.get("total_minutes", 0)
 
+        # Prolog já rejeita > minutos_por_dia → só precisas penalizar subutilização
         if minutos_planejados < 0.7 * minutos_por_dia:
             score -= 3
-        elif minutos_planejados > minutos_por_dia:
-            score -= 5
+        # 'elif minutos_planejados > minutos_por_dia' — REMOVIDO, redundante com Regra 1
 
     return max(0, min(20, score))
 def calculate_score(athlete: dict, plan:dict, catalog:list, soft_violations:list=None)->dict:
@@ -157,7 +159,7 @@ def calculate_score(athlete: dict, plan:dict, catalog:list, soft_violations:list
     soft_penalty = len(soft_violations) * 2  # ex: -2 pts por cada
     goal_focus   = calculate_goal_focus(plan, athlete["primary_goal"])
     distribution = evaluate_distribution(plan,athlete["availability"]["available_days"])
-    progression  = calculate_intesity_progression(plan)
+    progression  = calculate_intensity_progression(plan)
     efficiency   = evaluate_time_efficiency(plan, athlete)
 
     ratio = used / eligible if eligible > 0 else 0
