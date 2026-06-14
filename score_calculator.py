@@ -151,9 +151,10 @@ def evaluate_time_efficiency(plan: dict, athlete: dict) -> int:
             score -= 5
 
     return max(0, min(20, score))
-def calculate_score(athlete: dict, plan:dict, catalog:list)->dict:
+def calculate_score(athlete: dict, plan:dict, catalog:list, soft_violations:list=None)->dict:
     
     used, eligible      = count_unique_blocks(plan,athlete,catalog)
+    soft_penalty = len(soft_violations) * 2  # ex: -2 pts por cada
     goal_focus   = calculate_goal_focus(plan, athlete["primary_goal"])
     distribution = evaluate_distribution(plan,athlete["availability"]["available_days"])
     progression  = calculate_intesity_progression(plan)
@@ -190,7 +191,7 @@ def calculate_score(athlete: dict, plan:dict, catalog:list)->dict:
         }
     }
 
-    total = sum(item["score"] for item in score_details.values())
+    total = sum(item["score"] for item in score_details.values()) - soft_penalty
     return {
         "score": round(total, 1),
         "details": score_details

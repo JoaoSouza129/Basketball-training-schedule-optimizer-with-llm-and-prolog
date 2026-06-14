@@ -82,6 +82,8 @@ O plano anterior foi rejeitado. Usa esta informação como contexto obrigatório
 
     return prompt
 
+
+
 def call_llm(system_prompt: str, user_prompt: str)->dict:
     
 

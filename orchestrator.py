@@ -10,9 +10,11 @@ from typing import List
 
 class PlanoResultado:
 
-    def __init__(self, plano: dict, historico_violacoes: List[str]):
+    def __init__(self, plano: dict, historico_violacoes: List[str], score: float, historico_por_tentativa: list):
         self._plano = plano
         self.historico_violacoes = historico_violacoes
+        self.score = score
+        self.historico_por_tentativa = historico_por_tentativa or []
 
     # --- transparência para acesso dict-like (usado em app.py) ---
     def __getitem__(self, key):
@@ -34,7 +36,7 @@ class PlanoResultado:
         return self._plano.values()
 
     def __repr__(self):
-        return f"PlanoResultado(historico_violacoes={self.historico_violacoes}, plano={self._plano})"
+        return f"PlanoResultado(historico_violacoes={self.historico_violacoes}, plano={self._plano}, score={self.score}, historico_por_tentativa={self.historico_por_tentativa})"
 
 # Adicionar o diretório pai ao path (se necessário)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -70,6 +72,19 @@ def formatar_violacoes_para_llm(violacoes: list) -> str:
         
     return "\n".join(linhas)
 
+def formatar_soft_violacoes(soft_violacoes: list) -> str:
+    if not soft_violacoes:
+        return ""
+    linhas = ["### Recomendações (não obrigatórias):"]
+    for sv in soft_violacoes:
+        regra = sv.get("rule", "")
+        arg1 = sv.get("arg1", "")
+        arg2 = sv.get("arg2", "")
+        if regra == "recommend_rest_after_high_intensity":
+            linhas.append(
+                f"- Após sessão intensa a {arg1}, considera colocar descanso a {arg2} em vez de treino."
+            )
+    return "\n".join(linhas)
 
 def construir_feedback_estruturado(violations: list, historico_violacoes: list) -> dict:
     regras_atuais = [v.get("rule", "desconhecida") for v in violations]
@@ -111,6 +126,7 @@ def pipeline_principal(user_input: dict):
     feedback_anterior = ""
     count=0
     historico_violacoes = []
+    historico_por_tentativa = []  
     #for tentativa in range(1, MAX_TENTATIVAS + 1):
     while not plan_validated: 
         count+=1
@@ -125,17 +141,30 @@ def pipeline_principal(user_input: dict):
 
         if resultado["is_valid"]:
             print("✅ Plano validado com sucesso!")
+            soft_feedback = formatar_soft_violacoes(resultado["soft_violations"])
+            if soft_feedback:
+                print(f"⚠️ Plano aceite com recomendações:\n{soft_feedback}")
             plan_validated=True
-            return PlanoResultado(plano, historico_violacoes)
+            score = calculate_score(atleta,plano,FULL_CATALOG,resultado["soft_violations"])
+            print(score)            
+            return PlanoResultado(plano, historico_violacoes,score, historico_por_tentativa)
         else:
             print("❌ Plano inválido. Preparando feedback...")
+
+            regras_desta_tentativa = [
+                v.get("rule", "desconhecida") for v in resultado["violations"]
+            ]
+            historico_por_tentativa.append(regras_desta_tentativa)
+
             feedback_estruturado = construir_feedback_estruturado(
                 resultado["violations"],
                 historico_violacoes,
             )
+            
             historico_violacoes.extend(
                 violacao.get("rule", "desconhecida") for violacao in resultado["violations"]
             )
+            
             feedback_anterior = feedback_estruturado
 
     #print("⚠️ Número máximo de tentativas atingido. Retornando último plano.")
@@ -170,4 +199,3 @@ if __name__ == "__main__":
         print("\n--- PLANO FINAL ---")
         print(json.dumps(plano_final, indent=2, ensure_ascii=False))
     print("\n")
-    print(calculate_score(user_input,plano_final,FULL_CATALOG))
