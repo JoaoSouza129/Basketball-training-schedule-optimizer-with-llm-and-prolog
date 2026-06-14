@@ -1,5 +1,6 @@
 import json
 import dotenv
+from groq import Groq
 import sys
 import os
 import urllib.error
@@ -8,12 +9,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 dotenv.load_dotenv()
 API_KEY=os.getenv("GROQ_API_KEY")
 OLLAMA_API_KEY=os.getenv("OLLAMA-API-KEY")
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openai/gpt-oss-20b:free")
-OPENROUTER_API_KEY=os.getenv("OPENROUTER-API-KEY")
 OLLAMA_HOST = "http://localhost:11434"
 OLLAMA_CLOUD_MODEL =  "gemma3:12b-cloud"
-OLLAMA_CLOUD_API_KEY = os.getenv("OLLAMA-API-KEY")
+
 
 # Carrega o schema JSON
 def load_output_schema() -> dict:
@@ -78,14 +76,14 @@ O plano anterior foi rejeitado. Usa esta informação como contexto obrigatório
 
 ### Instrução de Correção
 - Corrige todas as violações listadas no feedback.
-- Se a mesma regra aparecer repetida, altera a estratégia do plano e não apenas o bloco isolado.
+- Se a mesma violação se repetir mais de 2 vezes, usa o raciocinio logico para mudar a estratégia do treino.
 - Mantém o output estritamente em JSON válido.
 """
 
     return prompt
 
 def call_llm(system_prompt: str, user_prompt: str)->dict:
-    from groq import Groq
+    
 
     client=Groq(api_key=API_KEY)
     schema = load_output_schema()
@@ -96,7 +94,7 @@ def call_llm(system_prompt: str, user_prompt: str)->dict:
             {"role": "user", "content": user_prompt}
         ],
         model="meta-llama/llama-4-scout-17b-16e-instruct",  # Modelo potente
-        temperature=0.3,  # Reduzido para mais consistência
+        temperature=1,  # Reduzido para mais consistência
         max_tokens=8192,
         response_format={
             "type": "json_object",
@@ -111,74 +109,6 @@ def call_llm(system_prompt: str, user_prompt: str)->dict:
         return json.loads(json_str)
     except json.JSONDecodeError as e:
         raise ValueError(f"LLM devolveu JSON inválido: {json_str}") from e
-
-"""
-def _call_openrouter_chat(
-    system_prompt: str,
-    user_prompt: str,
-    *,
-    model: str,
-    api_key: str = "",
-    temperature: float = 0.1,
-    num_predict: int = 8192,
-) -> dict:
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "stream": False,
-        "temperature": temperature,
-        "max_tokens": num_predict,
-        "response_format": {"type": "json_object"},
-    }
-
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-   
-    request = urllib.request.Request(
-        f"{OPENROUTER_BASE_URL.rstrip('/')}/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
-
-    try:
-        with urllib.request.urlopen(request, timeout=120) as response:
-            print(f"Resposta do modelo {model}: \n")
-            response_payload = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Falha ao chamar o OpenRouter ({e.code}): {error_body}") from e
-    except urllib.error.URLError as e:
-        raise RuntimeError(
-            f"Nao foi possivel conectar ao OpenRouter em {OPENROUTER_BASE_URL}. Verifique a configuracao da API."
-        ) from e
-
-    json_str = _extract_json_text(
-        response_payload.get("choices", [{}])[0].get("message", {}).get("content", "")
-    )
-
-    try:
-        return json.loads(json_str)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"LLM devolveu JSON inválido: {json_str}") from e
-
-
-def call_llm_openrouter(system_prompt: str, user_prompt: str) -> dict:
-    return _call_openrouter_chat(
-        system_prompt,
-        user_prompt,
-        model=OPENROUTER_MODEL,
-        api_key=OPENROUTER_API_KEY,
-        temperature=0.1,
-        num_predict=8192,
-    )
-
-"""
-
 
 
 

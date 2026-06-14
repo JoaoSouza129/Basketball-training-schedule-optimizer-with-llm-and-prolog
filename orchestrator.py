@@ -4,6 +4,37 @@ import os
 import sys
 import json
 from collections import Counter
+from dataclasses import dataclass, field
+from typing import List
+
+
+class PlanoResultado:
+
+    def __init__(self, plano: dict, historico_violacoes: List[str]):
+        self._plano = plano
+        self.historico_violacoes = historico_violacoes
+
+    # --- transparência para acesso dict-like (usado em app.py) ---
+    def __getitem__(self, key):
+        return self._plano[key]
+
+    def __contains__(self, key):
+        return key in self._plano
+
+    def get(self, key, default=None):
+        return self._plano.get(key, default)
+
+    def items(self):
+        return self._plano.items()
+
+    def keys(self):
+        return self._plano.keys()
+
+    def values(self):
+        return self._plano.values()
+
+    def __repr__(self):
+        return f"PlanoResultado(historico_violacoes={self.historico_violacoes}, plano={self._plano})"
 
 # Adicionar o diretório pai ao path (se necessário)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -58,8 +89,6 @@ def construir_feedback_estruturado(violations: list, historico_violacoes: list) 
 
 
 
-
-
 def pipeline_principal(user_input: dict):
     # 1. Normalizar input
     atleta = normalize_input(user_input)
@@ -78,10 +107,14 @@ def pipeline_principal(user_input: dict):
     system_prompt = load_system_prompt()
 
     # 5. Loop de tentativas
+    plan_validated=False
     feedback_anterior = ""
+    count=0
     historico_violacoes = []
-    for tentativa in range(1, MAX_TENTATIVAS + 1):
-        print(f"\n[TENTATIVA {tentativa}] Solicitando plano ao LLM...")
+    #for tentativa in range(1, MAX_TENTATIVAS + 1):
+    while not plan_validated: 
+        count+=1
+        print(f"\n[TENTATIVA {count}] Solicitando plano ao LLM...")
         
         user_prompt = gerar_user_prompt(atleta, blocos, feedback_anterior)
         plano = call_llm_ollama_cloud(system_prompt, user_prompt)
@@ -92,7 +125,8 @@ def pipeline_principal(user_input: dict):
 
         if resultado["is_valid"]:
             print("✅ Plano validado com sucesso!")
-            return plano
+            plan_validated=True
+            return PlanoResultado(plano, historico_violacoes)
         else:
             print("❌ Plano inválido. Preparando feedback...")
             feedback_estruturado = construir_feedback_estruturado(
@@ -104,8 +138,8 @@ def pipeline_principal(user_input: dict):
             )
             feedback_anterior = feedback_estruturado
 
-    print("⚠️ Número máximo de tentativas atingido. Retornando último plano.")
-    return plano
+    #print("⚠️ Número máximo de tentativas atingido. Retornando último plano.")
+    #return PlanoResultado(plano, historico_violacoes)
 
 DAYS_OF_WEEK = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
